@@ -8,8 +8,7 @@ env/
 # Secrets and environment variables
 .env
 
-# Local Databases and dynamic user uploads
-chroma_store/
+# Dynamic user uploads
 data/_current_upload.csv
 
 # Note: You can push data/sample_transactions.csv and models/checker.joblib 
