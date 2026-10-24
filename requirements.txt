@@ -5,16 +5,12 @@ langchain-google-genai
 langchain-google-vertexai
 langchain-chroma
 chromadb
-langchain-huggingface
-sentence-transformers
 pandas
 scikit-learn
 joblib
 ragas
 datasets
 pypdf
-transformers
-torch
 requests
 finnhub-python
 yfinance
