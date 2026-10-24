@@ -47,8 +47,8 @@ def flag_transactions(df: pd.DataFrame):
     scores = model.predict_proba(X_pred)[:, 1]
     df = df.assign(risk_score=scores)
     
-    # HYBRID OVERRIDE: Guarantee flagging for critical business rules
-    df.loc[df["is_drain"] == 1, "risk_score"] = 0.99
+    # HYBRID OVERRIDE: Evaluate against df_feat, apply to df
+    df.loc[df_feat["is_drain"] == 1, "risk_score"] = 0.99
     
     return df[df.risk_score >= 0.85].sort_values("risk_score", ascending=False)
 
