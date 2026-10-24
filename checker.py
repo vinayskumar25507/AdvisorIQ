@@ -18,6 +18,8 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     df["orig_error"] = (df["oldbalanceOrg"] - df["amount"]) - df["newbalanceOrig"]
     df["dest_error"] = (df["oldbalanceDest"] + df["amount"]) - df["newbalanceDest"]
     df["log_amount"] = np.log1p(df["amount"])
+    
+    # Deterministic feature
     df["is_drain"] = ((df["amount"] == df["oldbalanceOrg"]) & (df["amount"] > 0)).astype(int)
     return df
 
@@ -44,6 +46,10 @@ def flag_transactions(df: pd.DataFrame):
     
     scores = model.predict_proba(X_pred)[:, 1]
     df = df.assign(risk_score=scores)
+    
+    # HYBRID OVERRIDE: Guarantee flagging for critical business rules
+    df.loc[df["is_drain"] == 1, "risk_score"] = 0.99
+    
     return df[df.risk_score >= 0.85].sort_values("risk_score", ascending=False)
 
 if __name__ == "__main__":

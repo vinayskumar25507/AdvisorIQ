@@ -8,8 +8,7 @@ env/
 # Secrets and environment variables
 .env
 
-# Dynamic user uploads and Dataset
+# Dynamic user uploads
 data/_current_upload.csv
-data/PS_20174392719_1491204439457_log.csv
 # Note: You can push data/sample_transactions.csv and models/checker.joblib 
 # so Render has the trained model and sample data ready on deployment.
