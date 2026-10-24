@@ -1,4 +1,5 @@
 # agent.py
+import os
 import shutil
 from pathlib import Path
 import pandas as pd
@@ -12,7 +13,15 @@ from guardrails import make_safe
 from dotenv import load_dotenv
 load_dotenv()
 
-llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", temperature=0)
+api_key = os.environ.get("GOOGLE_API_KEY")
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-3.5-flash-lite",
+    google_api_key=api_key,
+    temperature=0.0,
+    # Or implement this instruction via the standard LangChain PromptTemplate
+    system_instruction="You are a strict financial compliance AI. Summarize the provided ledger anomalies. Do not provide financial advice. If no anomalies are provided in the context, explicitly state 'I have reviewed your ledger, and no suspicious transactions were found.' and output nothing else."
+)
 retriever = get_retriever()
 UPLOAD_PATH = "data/_current_upload.csv"
 

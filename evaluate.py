@@ -8,7 +8,7 @@ load_dotenv()
 api_key = os.environ.get("GOOGLE_API_KEY")
 
 # Initialize Gemini model with the explicit key parameter
-llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", google_api_key=api_key)
+llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash-lite", google_api_key=api_key, temperature=0.0)
 
 question = "Is Apple a good buy right now?"
 answer = "Regarding your interest in Apple (AAPL), the stock is currently trading at $348.22, reflecting a 3.3% increase over the past month."
@@ -29,4 +29,4 @@ Reasoning: [Brief explanation]
 
 response = llm.invoke(prompt)
 print("=== Evaluation Metrics (Gemini Judge) ===")
-print(response.content)
+print(response.content[0]["text"])

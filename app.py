@@ -30,6 +30,8 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AdvisorIQ | Wealth Management & Risk Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Added marked.js to parse the Markdown output -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -57,6 +59,13 @@ HTML_TEMPLATE = """
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 3px; }
+        
+        /* Markdown Rendering Styles */
+        .md-content h1, .md-content h2, .md-content h3 { font-weight: 600; margin-top: 1em; margin-bottom: 0.5em; }
+        .md-content p { margin-bottom: 1em; }
+        .md-content strong { font-weight: 700; color: #10b981; }
+        .md-content ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 1em; }
+        .md-content hr { border-color: #222634; margin: 1.5em 0; }
     </style>
 </head>
 <body class="bg-lightBg dark:bg-darkBg text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
@@ -111,7 +120,6 @@ HTML_TEMPLATE = """
                         <input type="file" id="csvFiles" accept=".csv" multiple class="hidden" onchange="handleFilesSelected(this)">
                     </label>
                     
-                    <!-- Selected Files List Container -->
                     <div id="fileListContainer" class="space-y-2 mt-2"></div>
                 </div>
 
@@ -219,7 +227,8 @@ HTML_TEMPLATE = """
                 const data = await response.json();
 
                 if (response.ok) {
-                    outputContainer.innerHTML = `<div class="p-4 rounded-xl bg-slate-50 dark:bg-[#0d1017] border border-borderLight dark:border-borderDark whitespace-pre-wrap">${data.result}</div>`;
+                    // Applied marked.parse() to render standard HTML formatting
+                    outputContainer.innerHTML = `<div class="md-content p-4 rounded-xl bg-slate-50 dark:bg-[#0d1017] border border-borderLight dark:border-borderDark whitespace-pre-wrap">${marked.parse(data.result)}</div>`;
                     statusBadge.textContent = 'Completed';
                     statusBadge.className = 'text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium';
                 } else {
