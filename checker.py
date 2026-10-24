@@ -1,9 +1,12 @@
+# checker.py
 import pandas as pd
 import joblib
 from pathlib import Path
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import precision_score, recall_score, f1_score, roc_auc_score
 import numpy as np
 
 FEATURES = ["amount", "hour", "orig_error", "dest_error", "log_amount", "is_drain"]
@@ -29,10 +32,36 @@ def train(csv="data/sample_transactions.csv"):
     X = df_feat[FEATURES].fillna(0)
     y = df["isFraud"].astype(int)
     
+    # Split data to evaluate metrics robustly on unseen test records
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42, stratify=y if y.sum() > 1 else None
+    )
+    
     model = Pipeline([
         ("scaler", StandardScaler()),
         ("classifier", RandomForestClassifier(n_estimators=100, max_depth=3, random_state=42))
     ])
+    model.fit(X_train, y_train)
+    
+    # Calculate evaluation metrics
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
+    
+    precision = precision_score(y_test, y_pred, zero_division=0)
+    recall = recall_score(y_test, y_pred, zero_division=0)
+    f1 = f1_score(y_test, y_pred, zero_division=0)
+    roc_auc = roc_auc_score(y_test, y_prob) if len(set(y_test)) > 1 else 0.0
+    
+    print("========================================")
+    print(" MODEL EVALUATION METRICS (checker.py)")
+    print("========================================")
+    print(f" Precision : {precision:.4f}")
+    print(f" Recall    : {recall:.4f}")
+    print(f" F1 Score  : {f1:.4f}")
+    print(f" ROC-AUC   : {roc_auc:.4f}")
+    print("========================================")
+    
+    # Retrain model on the full dataset for production/deployment usage
     model.fit(X, y)
     Path(MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, MODEL_PATH)
