@@ -10,7 +10,7 @@ import pandas as pd
 
 from agent import run_advisor
 from guardrails import redact_pii
-from checker import flag_transactions  # Imported to extract the numerical score
+from checker import flag_transactions
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -34,7 +34,7 @@ HTML_TEMPLATE = """
     <title>AdvisorIQ | Wealth Management & Risk Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Chart.js added -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -135,9 +135,10 @@ HTML_TEMPLATE = """
                 <span id="statusBadge" class="text-xs px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">Idle</span>
             </div>
 
-            <!-- Visualization Canvas Added Here -->
+            <!-- Visualization Canvas Container -->
             <div id="chartContainer" class="hidden w-full mb-6 pb-6 border-b border-borderLight dark:border-borderDark">
-                <canvas id="riskChart" style="max-height: 120px;"></canvas>
+                <div class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Risk Anomaly Analysis</div>
+                <canvas id="riskChart" style="max-height: 180px;"></canvas>
             </div>
 
             <div id="outputContainer" class="flex-1 custom-scrollbar overflow-y-auto text-sm leading-relaxed space-y-4 text-slate-600 dark:text-slate-300">
@@ -230,24 +231,27 @@ HTML_TEMPLATE = """
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Render AI Markdown response
                     outputContainer.innerHTML = `<div class="md-content p-4 rounded-xl bg-slate-50 dark:bg-[#0d1017] border border-borderLight dark:border-borderDark whitespace-pre-wrap">${marked.parse(data.result)}</div>`;
                     
-                    // Render Chart.js visualization if risk score is returned
-                    if (data.max_risk_score !== undefined && data.max_risk_score > 0) {
+                    // Render multi-bar risk chart ONLY if risk scores array is provided and non-empty
+                    if (data.risk_scores && data.risk_scores.length > 0) {
                         chartContainer.classList.remove('hidden');
                         const ctx = document.getElementById('riskChart').getContext('2d');
                         
                         if (window.riskGauge) window.riskGauge.destroy();
                         
+                        // Map multiple risk scores into dynamic labels and background colors
+                        const labels = data.risk_scores.map((_, i) => `Transaction Flag #${i + 1}`);
+                        const bgColors = data.risk_scores.map(score => score >= 0.85 ? '#ef4444' : '#10b981');
+
                         window.riskGauge = new Chart(ctx, {
                             type: 'bar',
                             data: {
-                                labels: ['Maximum Detected Risk'],
+                                labels: labels,
                                 datasets: [{
-                                    label: 'Risk Score',
-                                    data: [data.max_risk_score],
-                                    backgroundColor: data.max_risk_score >= 0.85 ? '#ef4444' : '#10b981',
+                                    label: 'Risk Score Assessment',
+                                    data: data.risk_scores,
+                                    backgroundColor: bgColors,
                                 }]
                             },
                             options: {
@@ -292,7 +296,7 @@ async def api_advise(question: str = Form(...), csv_files: list[UploadFile] = Fi
     try:
         csv_path = None
         MAX_FILE_SIZE = 5 * 1024 * 1024 
-        max_risk = 0.0
+        risk_scores = []
         
         if csv_files and len(csv_files) > 0 and csv_files[0].filename:
             combined_content = ""
@@ -310,20 +314,25 @@ async def api_advise(question: str = Form(...), csv_files: list[UploadFile] = Fi
             with open(csv_path, "w", encoding="utf-8") as f:
                 f.write(combined_content)
 
-            # Analyze dataframe to extract max risk score for the frontend visualization
-            try:
-                df = pd.read_csv(csv_path)
-                flagged_df = flag_transactions(df)
-                if not flagged_df.empty:
-                    max_risk = float(flagged_df["risk_score"].max())
-            except Exception as e:
-                logger.error(f"Failed to calculate risk score: {e}")
+            # Check if user query actually asks about risk, fraud, checks, or anomalies
+            risk_keywords = ["risk", "fraud", "suspicious", "drain", "anomaly", "flag", "safe", "secure", "threat"]
+            is_risk_query = any(keyword in question.lower() for keyword in risk_keywords)
+
+            if is_risk_query:
+                try:
+                    df = pd.read_csv(csv_path)
+                    flagged_df = flag_transactions(df)
+                    if not flagged_df.empty and "risk_score" in flagged_df.columns:
+                        # Extract top risk scores (e.g., top 5 highest risk scores to support multi-bar view)
+                        top_risks = flagged_df.sort_values(by="risk_score", ascending=False)["risk_score"].head(5).tolist()
+                        risk_scores = [float(score) for score in top_risks if score > 0.3] # filter significant risks
+                except Exception as e:
+                    logger.error(f"Failed to calculate risk score: {e}")
         
         result = run_advisor(question, csv_path)
         logger.info("Advisor execution completed successfully.")
         
-        # Return both the AI text and the numeric score
-        return {"result": result, "max_risk_score": max_risk}
+        return {"result": result, "risk_scores": risk_scores}
         
     except HTTPException:
         raise
