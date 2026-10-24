@@ -1,0 +1,16 @@
+# Python cache and virtual environments
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# Secrets and environment variables
+.env
+
+# Local Databases and dynamic user uploads
+chroma_store/
+data/_current_upload.csv
+
+# Note: You can push data/sample_transactions.csv and models/checker.joblib 
+# so Render has the trained model and sample data ready on deployment.

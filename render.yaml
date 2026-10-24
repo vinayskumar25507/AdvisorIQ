@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: advisoriq
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt && python checker.py && python rag.py"
+    startCommand: "python app.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      - key: LANGCHAIN_TRACING_V2
+        value: "true"
+      - key: LANGCHAIN_PROJECT
+        value: "advisoriq"
+      # API keys are intentionally left blank here for security. 
+      # Render will prompt you to enter them securely in the dashboard.
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: LANGCHAIN_API_KEY
+        sync: false
