@@ -4,16 +4,18 @@ AdvisorIQ is an enterprise-grade wealth management assistant and risk intelligen
 
 ### Key Features
 * **Custom Fintech Terminal:** A lightweight, minimalist web UI built with FastAPI, vanilla JavaScript, and Tailwind CSS, featuring dark/light mode and dynamic multi-file CSV uploads.
-* **Generative AI Agent:** Powered by Gemini 3.5 via LangChain's native `bind_tools`, the agent intelligently routes user queries to live market data, semantic document search, or anomaly detection tools.
-* **Organic Risk Scoring:** A robust `scikit-learn` Random Forest pipeline (`checker.py`) that analyzes financial ledgers for account-drainage behaviors and anomalies, achieving highly realistic ROC-AUC scores.
-* **Retrieval-Augmented Generation (RAG):** Local semantic search using ChromaDB and HuggingFace sentence transformers to ground AI responses in actual compliance and financial education documents.
+* **Generative AI Agent:** Powered by Gemini via LangChain's native `bind_tools`, the agent intelligently routes user queries to live market data, semantic document search, or anomaly detection tools.
+* **Organic Risk Scoring:** A robust `scikit-learn` Random Forest pipeline (`checker.py`) that analyzes financial ledgers for account-drainage behaviors and anomalies, augmented by a hybrid rules engine.
+* **Interactive Visualizations:** Context-aware Chart.js multi-bar risk gauge charts that render dynamically on the frontend exclusively during transaction risk anomaly screenings.
+* **Automated Testing Suite:** Comprehensive unit testing via `pytest` integrated within an isolated branch workflow to guarantee pipeline stability.
+* **Retrieval-Augmented Generation (RAG):** Local semantic search using ChromaDB and HuggingFace sentence transformers to ground AI responses in actual compliance and financial education documents (SEBI/GST).
 * **Enterprise Guardrails:** Strict PII redaction (account numbers, emails, phone numbers) and compliance filters that block over-promising financial phrases.
 
 ### Tech Stack
 * **Backend:** FastAPI, Uvicorn, Python
-* **AI & Machine Learning:** LangChain, Google Gemini 3.5, scikit-learn, HuggingFace, ChromaDB
+* **AI & Machine Learning:** LangChain, Google Gemini, scikit-learn, HuggingFace, ChromaDB
 * **Data Processing:** pandas, numpy, yfinance
-* **Frontend:** HTML5, Tailwind CSS, Vanilla JS
+* **Frontend & Visualization:** HTML5, Tailwind CSS, Vanilla JS, Chart.js
 
 ### Local Setup & Execution
 1. Clone the repository.
@@ -23,6 +25,12 @@ AdvisorIQ is an enterprise-grade wealth management assistant and risk intelligen
 5. Generate the machine learning risk model and transaction data: `python setup_data.py`
 6. Launch the application: `python app.py`
 7. Access the terminal at `http://127.0.0.1:7860`.
+
+### Testing
+Run the automated test suite locally to verify pipeline integrity:
+```bash
+pytest test_checker.py
+```
 
 ### Deployment
 This application is configured for seamless deployment on Render using standard Uvicorn commands.
