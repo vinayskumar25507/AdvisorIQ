@@ -6,8 +6,11 @@ import tempfile
 import logging
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse
+import pandas as pd
+
 from agent import run_advisor
 from guardrails import redact_pii
+from checker import flag_transactions  # Imported to extract the numerical score
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -30,8 +33,8 @@ HTML_TEMPLATE = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AdvisorIQ | Wealth Management & Risk Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Added marked.js to parse the Markdown output -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Chart.js added -->
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -60,7 +63,6 @@ HTML_TEMPLATE = """
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.3); border-radius: 3px; }
         
-        /* Markdown Rendering Styles */
         .md-content h1, .md-content h2, .md-content h3 { font-weight: 600; margin-top: 1em; margin-bottom: 0.5em; }
         .md-content p { margin-bottom: 1em; }
         .md-content strong { font-weight: 700; color: #10b981; }
@@ -70,7 +72,6 @@ HTML_TEMPLATE = """
 </head>
 <body class="bg-lightBg dark:bg-darkBg text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-300">
 
-    <!-- Top Navigation Bar -->
     <header class="border-b border-borderLight dark:border-borderDark bg-white/70 dark:bg-cardDark/70 backdrop-blur-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
@@ -94,10 +95,8 @@ HTML_TEMPLATE = """
         </div>
     </header>
 
-    <!-- Main Workspace Container -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        <!-- Left Panel: Input & Controls -->
         <section class="lg:col-span-5 bg-white dark:bg-cardDark border border-borderLight dark:border-borderDark rounded-2xl p-6 shadow-sm flex flex-col space-y-6">
             <div>
                 <h1 class="text-xl font-semibold tracking-tight">Intelligence Query</h1>
@@ -130,11 +129,15 @@ HTML_TEMPLATE = """
             </form>
         </section>
 
-        <!-- Right Panel: Results & Feed -->
         <section class="lg:col-span-7 bg-white dark:bg-cardDark border border-borderLight dark:border-borderDark rounded-2xl p-6 shadow-sm flex flex-col min-h-[500px]">
             <div class="flex items-center justify-between border-b border-borderLight dark:border-borderDark pb-4 mb-4">
                 <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Analysis Feed</h2>
                 <span id="statusBadge" class="text-xs px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">Idle</span>
+            </div>
+
+            <!-- Visualization Canvas Added Here -->
+            <div id="chartContainer" class="hidden w-full mb-6 pb-6 border-b border-borderLight dark:border-borderDark">
+                <canvas id="riskChart" style="max-height: 120px;"></canvas>
             </div>
 
             <div id="outputContainer" class="flex-1 custom-scrollbar overflow-y-auto text-sm leading-relaxed space-y-4 text-slate-600 dark:text-slate-300">
@@ -146,7 +149,6 @@ HTML_TEMPLATE = """
 
     </main>
 
-    <!-- Footer -->
     <footer class="border-t border-borderLight dark:border-borderDark py-4 text-center text-xs text-slate-400 dark:text-slate-500">
         Enterprise PII Redaction Active • Educational & Regulatory Compliance Framework
     </footer>
@@ -203,6 +205,7 @@ HTML_TEMPLATE = """
             const spinner = document.getElementById('spinner');
             const statusBadge = document.getElementById('statusBadge');
             const outputContainer = document.getElementById('outputContainer');
+            const chartContainer = document.getElementById('chartContainer');
 
             if (!question.trim()) return;
 
@@ -227,17 +230,45 @@ HTML_TEMPLATE = """
                 const data = await response.json();
 
                 if (response.ok) {
-                    // Applied marked.parse() to render standard HTML formatting
+                    // Render AI Markdown response
                     outputContainer.innerHTML = `<div class="md-content p-4 rounded-xl bg-slate-50 dark:bg-[#0d1017] border border-borderLight dark:border-borderDark whitespace-pre-wrap">${marked.parse(data.result)}</div>`;
+                    
+                    // Render Chart.js visualization if risk score is returned
+                    if (data.max_risk_score !== undefined && data.max_risk_score > 0) {
+                        chartContainer.classList.remove('hidden');
+                        const ctx = document.getElementById('riskChart').getContext('2d');
+                        
+                        if (window.riskGauge) window.riskGauge.destroy();
+                        
+                        window.riskGauge = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Maximum Detected Risk'],
+                                datasets: [{
+                                    label: 'Risk Score',
+                                    data: [data.max_risk_score],
+                                    backgroundColor: data.max_risk_score >= 0.85 ? '#ef4444' : '#10b981',
+                                }]
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                maintainAspectRatio: false,
+                                scales: { x: { min: 0, max: 1 } }
+                            }
+                        });
+                    } else {
+                        chartContainer.classList.add('hidden');
+                    }
+
                     statusBadge.textContent = 'Completed';
                     statusBadge.className = 'text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium';
                 } else {
-                    outputContainer.innerHTML = `<div class="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500">${data.detail || 'An error occurred during execution.'}</div>`;
+                    outputContainer.innerHTML = `<div class="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500">${data.detail || 'An error occurred.'}</div>`;
                     statusBadge.textContent = 'Failed';
                     statusBadge.className = 'text-xs px-2.5 py-1 rounded-md bg-red-500/10 text-red-500 font-medium';
                 }
             } catch (err) {
-                outputContainer.innerHTML = `<div class="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500">Network error: Could not reach backend service.</div>`;
+                outputContainer.innerHTML = `<div class="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500">Network error.</div>`;
                 statusBadge.textContent = 'Error';
                 statusBadge.className = 'text-xs px-2.5 py-1 rounded-md bg-red-500/10 text-red-500 font-medium';
             } finally {
@@ -260,7 +291,8 @@ async def api_advise(question: str = Form(...), csv_files: list[UploadFile] = Fi
     logger.info(f"Incoming query received. Processing prompt length: {len(question)}")
     try:
         csv_path = None
-        MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB limit
+        MAX_FILE_SIZE = 5 * 1024 * 1024 
+        max_risk = 0.0
         
         if csv_files and len(csv_files) > 0 and csv_files[0].filename:
             combined_content = ""
@@ -277,10 +309,22 @@ async def api_advise(question: str = Form(...), csv_files: list[UploadFile] = Fi
             csv_path = os.path.join(tempfile.gettempdir(), "advisoriq_upload.csv")
             with open(csv_path, "w", encoding="utf-8") as f:
                 f.write(combined_content)
+
+            # Analyze dataframe to extract max risk score for the frontend visualization
+            try:
+                df = pd.read_csv(csv_path)
+                flagged_df = flag_transactions(df)
+                if not flagged_df.empty:
+                    max_risk = float(flagged_df["risk_score"].max())
+            except Exception as e:
+                logger.error(f"Failed to calculate risk score: {e}")
         
         result = run_advisor(question, csv_path)
         logger.info("Advisor execution completed successfully.")
-        return {"result": result}
+        
+        # Return both the AI text and the numeric score
+        return {"result": result, "max_risk_score": max_risk}
+        
     except HTTPException:
         raise
     except Exception as e:
